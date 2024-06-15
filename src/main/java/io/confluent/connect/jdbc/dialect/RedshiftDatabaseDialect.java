@@ -16,6 +16,7 @@
 package io.confluent.connect.jdbc.dialect;
 
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Time;
@@ -26,13 +27,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
+import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.ExpressionBuilder.Transform;
 import io.confluent.connect.jdbc.util.IdentifierRules;
+import io.confluent.connect.jdbc.util.TableDefinition;
 import io.confluent.connect.jdbc.util.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +62,21 @@ public class RedshiftDatabaseDialect extends GenericDatabaseDialect {
       return new RedshiftDatabaseDialect(config);
     }
   }
+
+  static final String JSON_TYPE_NAME = "json";
+  static final String JSONB_TYPE_NAME = "jsonb";
+  static final String UUID_TYPE_NAME = "uuid";
+
+  /**
+   * Define the PG datatypes that require casting upon insert/update statements.
+   */
+  private static final Set<String> CAST_TYPES = Collections.unmodifiableSet(
+      Utils.mkSet(
+          JSON_TYPE_NAME,
+          JSONB_TYPE_NAME,
+          UUID_TYPE_NAME
+      )
+  );
 
   /**
    * Create a new dialect instance with the given connector configuration.
@@ -134,35 +154,112 @@ public class RedshiftDatabaseDialect extends GenericDatabaseDialect {
   }
 
   @Override
-  public String buildUpsertQueryStatement(
+  public String buildInsertStatement(
       TableId table,
       Collection<ColumnId> keyColumns,
-      Collection<ColumnId> nonKeyColumns
+      Collection<ColumnId> nonKeyColumns,
+      TableDefinition definition
   ) {
-    //MySql doesn't support SQL 2003:merge so here how the upsert is handled
-    final Transform<ColumnId> transform = (builder, col) -> {
-      builder.appendColumnName(col.name());
-      builder.append("=values(");
-      builder.appendColumnName(col.name());
-      builder.append(")");
-    };
-
     ExpressionBuilder builder = expressionBuilder();
-    builder.append("insert into ");
+    builder.append("INSERT INTO ");
     builder.append(table);
-    builder.append("(");
+    builder.append(" (");
     builder.appendList()
            .delimitedBy(",")
            .transformedBy(ExpressionBuilder.columnNames())
            .of(keyColumns, nonKeyColumns);
-    builder.append(") values(");
-    builder.appendMultiple(",", "?", keyColumns.size() + nonKeyColumns.size());
-    builder.append(") on duplicate key update ");
+    builder.append(") VALUES (");
     builder.appendList()
            .delimitedBy(",")
-           .transformedBy(transform)
-           .of(nonKeyColumns.isEmpty() ? keyColumns : nonKeyColumns);
+           .transformedBy(this.columnValueVariables(definition))
+           .of(keyColumns, nonKeyColumns);
+    builder.append(")");
     return builder.toString();
+  }
+
+  @Override
+  public String buildUpsertQueryStatement(
+      TableId table,
+      Collection<ColumnId> keyColumns,
+      Collection<ColumnId> nonKeyColumns,
+      TableDefinition definition
+  ) {
+    final Transform<ColumnId> transform = (builder, col) -> {
+      builder.appendColumnName(col.name())
+             .append("=EXCLUDED.")
+             .appendColumnName(col.name());
+    };
+
+    ExpressionBuilder builder = expressionBuilder();
+    builder.append("INSERT INTO ");
+    builder.append(table);
+    builder.append(" (");
+    builder.appendList()
+           .delimitedBy(",")
+           .transformedBy(ExpressionBuilder.columnNames())
+           .of(keyColumns, nonKeyColumns);
+    builder.append(") VALUES (");
+    builder.appendList()
+           .delimitedBy(",")
+           .transformedBy(this.columnValueVariables(definition))
+           .of(keyColumns, nonKeyColumns);
+    builder.append(") ON CONFLICT (");
+    builder.appendList()
+           .delimitedBy(",")
+           .transformedBy(ExpressionBuilder.columnNames())
+           .of(keyColumns);
+    if (nonKeyColumns.isEmpty()) {
+      builder.append(") DO NOTHING");
+    } else {
+      builder.append(") DO UPDATE SET ");
+      builder.appendList()
+              .delimitedBy(",")
+              .transformedBy(transform)
+              .of(nonKeyColumns);
+    }
+    return builder.toString();
+  }
+
+  /**
+   * Return the transform that produces a prepared statement variable for each of the columns.
+   * PostgreSQL may require the variable to have a type suffix, such as {@code ?::uuid}.
+   *
+   * @param defn the table definition; may be null if unknown
+   * @return the transform that produces the variable expression for each column; never null
+   */
+  protected Transform<ColumnId> columnValueVariables(TableDefinition defn) {
+    return (builder, columnId) -> {
+      builder.append("?");
+      builder.append(valueTypeCast(defn, columnId));
+    };
+  }
+
+  /**
+   * Return the typecast expression that can be used as a suffix for a value variable of the
+   * given column in the defined table.
+   *
+   * <p>This method returns a blank string except for those column types that require casting
+   * when set with literal values. For example, a column of type {@code uuid} must be cast when
+   * being bound with with a {@code varchar} literal, since a UUID value cannot be bound directly.
+   *
+   * @param tableDefn the table definition; may be null if unknown
+   * @param columnId  the column within the table; may not be null
+   * @return the cast expression, or an empty string; never null
+   */
+  protected String valueTypeCast(TableDefinition tableDefn, ColumnId columnId) {
+    if (tableDefn != null) {
+      ColumnDefinition defn = tableDefn.definitionForColumn(columnId.name());
+      if (defn != null) {
+        String typeName = defn.typeName(); // database-specific
+        if (typeName != null) {
+          typeName = typeName.toLowerCase();
+          if (CAST_TYPES.contains(typeName)) {
+            return "::" + typeName;
+          }
+        }
+      }
+    }
+    return "";
   }
 
   @Override
