@@ -57,8 +57,10 @@ public class BufferedRecords {
   private RecordValidator recordValidator;
   private FieldsMetadata fieldsMetadata;
   private PreparedStatement updatePreparedStatement;
+  private PreparedStatement updatePreparedStatementNew;
   private PreparedStatement deletePreparedStatement;
   private StatementBinder updateStatementBinder;
+  private StatementBinder updateStatementBinderNew;
   private StatementBinder deleteStatementBinder;
   private boolean deletesInBatch = false;
 
@@ -136,8 +138,18 @@ public class BufferedRecords {
       );
       close();
       updatePreparedStatement = dbDialect.createPreparedStatement(connection, insertSql);
+      final String insertSqlNew = "INSERT INTO \"data_warehouse\".\"development_ibnu_muhammad\".\"testing_ibn_kubeflow1\" ( \"params\", \"payload\", \"etl_id\", \"etl_id_ts\", \"etl_id_partition\", \"run_ts\" ) VALUES ( (JSON_PARSE ( '{ \"type\": \"string\", \"optional\": false, \"field\": \"params\" }' )), (JSON_PARSE ( '{ \"type\": \"string\", \"optional\": false, \"field\": \"params\" }' )), ('2019-10-10-11'), ('2022-10-10 11:30:30+00'), ('1698224979'::int8), ('2022-10-10 11:30:30+00') )";
+      updatePreparedStatementNew = dbDialect.createPreparedStatement(connection, insertSqlNew);
       updateStatementBinder = dbDialect.statementBinder(
           updatePreparedStatement,
+          config.pkMode,
+          schemaPair,
+          fieldsMetadata,
+          dbStructure.tableDefinition(connection, tableId),
+          config.insertMode
+      );
+      updateStatementBinderNew = dbDialect.statementBinder(
+          updatePreparedStatementNew,
           config.pkMode,
           schemaPair,
           fieldsMetadata,
@@ -180,7 +192,7 @@ public class BufferedRecords {
       if (isNull(record.value()) && nonNull(deleteStatementBinder)) {
         deleteStatementBinder.bindRecord(record);
       } else {
-        updateStatementBinder.bindRecord(record);
+        updateStatementBinderNew.bindRecord(record);
       }
     }
     executeUpdates();
@@ -193,7 +205,7 @@ public class BufferedRecords {
   }
 
   private void executeUpdates() throws SQLException {
-    int[] batchStatus = updatePreparedStatement.executeBatch();
+    int[] batchStatus = updatePreparedStatementNew.executeBatch();
     for (int updateCount : batchStatus) {
       if (updateCount == Statement.EXECUTE_FAILED) {
         throw new BatchUpdateException(

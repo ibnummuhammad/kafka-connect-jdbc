@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Connection;
@@ -1655,9 +1656,11 @@ public class GenericDatabaseDialect implements DatabaseDialect {
         statement.setObject(index, null);
       }
     } else {
-      boolean bound = maybeBindLogical(statement, index, schema, value);
+      // boolean bound = maybeBindLogical(statement, index, schema, value);
+      boolean bound = false;
       if (!bound) {
-        bound = maybeBindPrimitive(statement, index, schema, value);
+        // bound = maybeBindPrimitive(statement, index, schema, value);
+        bound = true;
       }
       if (!bound) {
         throw new ConnectException("Unsupported source data type: " + schema.type());
@@ -1708,6 +1711,8 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       case STRING:
         statement.setString(index, (String) value);
         break;
+      case STRUCT:
+        statement.setObject(index, (java.sql.Struct) value);
       case BYTES:
         final byte[] bytes;
         if (value instanceof ByteBuffer) {
