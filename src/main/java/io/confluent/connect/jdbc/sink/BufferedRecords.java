@@ -138,7 +138,7 @@ public class BufferedRecords {
       );
       close();
       updatePreparedStatement = dbDialect.createPreparedStatement(connection, insertSql);
-      final String insertSqlNew = "INSERT INTO \"data_warehouse\".\"development_ibnu_muhammad\".\"testing_ibn_kubeflow1\" ( \"params\", \"payload\", \"etl_id\", \"etl_id_ts\", \"etl_id_partition\", \"run_ts\" ) VALUES ( (JSON_PARSE ( '{ \"type\": \"string\", \"optional\": false, \"field\": \"params\" }' )), (JSON_PARSE ( '{ \"type\": \"string\", \"optional\": false, \"field\": \"params\" }' )), ?, ('2022-10-10 11:30:30+00'), ('1698224979'::int8), ('2022-10-10 11:30:30+00') )";
+      final String insertSqlNew = "INSERT INTO \"data_warehouse\".\"development_ibnu_muhammad\".\"testing_ibn_kubeflow1\" ( \"params\", \"payload\", \"etl_id\", \"etl_id_ts\", \"etl_id_partition\", \"run_ts\" ) VALUES ( (JSON_PARSE ( ? )), (JSON_PARSE ( ? )), ?, ('2022-10-10 11:30:30+00'), ('1698224979'::int8), ('2022-10-10 11:30:30+00') )";
       updatePreparedStatementNew = dbDialect.createPreparedStatement(connection, insertSqlNew);
       updateStatementBinder = dbDialect.statementBinder(
           updatePreparedStatement,

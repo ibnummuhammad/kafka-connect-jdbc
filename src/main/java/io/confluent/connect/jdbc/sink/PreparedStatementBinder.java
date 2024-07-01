@@ -167,7 +167,9 @@ public class PreparedStatementBinder implements StatementBinder {
       Struct valueStruct,
       int index
   ) throws SQLException {
-    statement.setString(1, (String) "2071-10-10-11");
+    statement.setString(1, (String) "{ \"type\": \"mencobabarangbaru\", \"optional\": false, \"field\": \"params\" }");
+    statement.setString(2, (String) "{ \"type\": \"mencobabarangbaru\", \"optional\": false, \"field\": \"testingtengtot\" }");
+    statement.setString(3, (String) "93-91-10-11");
     for (final String fieldName : fieldsMetadata.nonKeyFieldNames) {
       final Field field = record.valueSchema().field(fieldName);
       bindField(index++, field.schema(), valueStruct.get(field), fieldName);
