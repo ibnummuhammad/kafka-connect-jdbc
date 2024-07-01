@@ -127,15 +127,16 @@ public class BufferedRecords {
       );
       final String insertSql = getInsertSql();
       final String deleteSql = getDeleteSql();
+      final String insertSqlNew = "INSERT INTO \"data_warehouse\".\"development_ibnu_muhammad\".\"testing_ibn_kubeflow1\" ( \"params\", \"payload\", \"etl_id\", \"etl_id_ts\", \"etl_id_partition\", \"run_ts\" ) VALUES ( (JSON_PARSE ( ? )), (JSON_PARSE ( ? )), ?, ?, ?, ? )";
       log.debug(
           "{} sql: {} deleteSql: {} meta: {}",
           config.insertMode,
-          insertSql,
+          insertSqlNew,
           deleteSql,
           fieldsMetadata
       );
       close();
-      updatePreparedStatement = dbDialect.createPreparedStatement(connection, insertSql);
+      updatePreparedStatement = dbDialect.createPreparedStatement(connection, insertSqlNew);
       updateStatementBinder = dbDialect.statementBinder(
           updatePreparedStatement,
           config.pkMode,
