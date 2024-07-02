@@ -125,9 +125,8 @@ public class BufferedRecords {
           tableId,
           fieldsMetadata
       );
-      final String insertSqlOld = getInsertSql();
-      final String deleteSql = getDeleteSql();
       final String insertSql = String.format("INSERT INTO %s ( \"params\", \"payload\", \"etl_id\", \"etl_id_ts\", \"etl_id_partition\", \"run_ts\" ) VALUES ( (JSON_PARSE ( ? )), (JSON_PARSE ( ? )), ?, ?, ?, ? )", tableId);
+      final String deleteSql = getDeleteSql();
       log.debug(
           "{} sql: {} deleteSql: {} meta: {}",
           config.insertMode,
