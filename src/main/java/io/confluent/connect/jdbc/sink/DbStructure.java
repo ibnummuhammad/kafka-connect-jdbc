@@ -118,7 +118,7 @@ public class DbStructure {
           String.format("Table %s is missing and auto-creation is disabled", tableId)
       );
     }
-    String sql = dbDialect.buildCreateTableStatement(tableId, fieldsMetadata.allFields.values());
+    String sql = String.format("CREATE TABLE IF NOT EXISTS %s ( params SUPER, payload SUPER, etl_id VARCHAR(256), etl_id_ts TIMESTAMP, etl_id_partition BIGINT, run_ts TIMESTAMP )", tableId);
     log.info("Creating table with sql: {}", sql);
     dbDialect.applyDdlStatements(connection, Collections.singletonList(sql));
   }
