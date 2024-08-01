@@ -15,7 +15,7 @@ You can build kafka-connect-jdbc with Maven using the standard lifecycle phases.
 # How to Compile to jar
 
 ```shell
-mvn clean install -DskipTests -Dcheckstyle.skip
+mvn clean package -DskipTests -Dcheckstyle.skip
 
 cp ~/Documents/github/ibnummuhammad/kafka-connect-jdbc/target/kafka-connect-jdbc-10.7.6.jar ~/Documents/github/ibnummuhammad/debezium-examples/unwrap-smt/debezium-jdbc-es/kafka-connect-jdbc-10.7.6.jar
 ```
